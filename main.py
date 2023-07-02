@@ -7,7 +7,7 @@ import json
 import datetime
 
 interpreter = tf.lite.Interpreter(
-            model_path='assets\lite-model_movenet_singlepose_thunder_3.tflite')
+            model_path='models\lite-model_movenet_singlepose_thunder_3.tflite')
 interpreter.allocate_tensors()
 
 EDGES = {
