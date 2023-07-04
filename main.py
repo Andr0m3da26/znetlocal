@@ -54,81 +54,88 @@ def draw_connections(frame, keypoints, edges, confidence_threshold):
             cv2.line(frame, (int(x1), int(y1)),
                         (int(x2), int(y2)), (0, 0, 255), 2)
 
-record = False
+def reset_state():
+    global state
+    state = {'isCameraToggle': False, 'isVirtualCanvasToggle': False, 'isRecording': False, 'fileSelectedPath': ''}
+
+state = {'isCameraToggle': False, 'isVirtualCanvasToggle': False, 'isRecording': False, 'fileSelectedPath': ''}
 port = 5000
 print("Started server on port : ", port)
 
-async def transmit(websocket, path):
+# if iscameratoggle is true
+#   start stream
+
+# stream:
+# initialise camera variables
+# initialise camera video writer
+# initialise virtual canvas variables 
+# initialise virtual canvas video writer
+
+# while iscameratoggle is true
+#   read camera frame
+#   if isvirtualcanvastoggle is true
+#       process frame
+#   if isvirtualcanvastoggle and isrecording is true
+#       write frame to virtual canvas video writer
+#   if isvirtualcanvastoggle is true 
+#   send camera frame and/ virtual canvas frame to client   
+#   
+#   if isrecording is false
+#       stop camera recording
+#       if virtualcanvastoggle is true
+#           stop virtual canvas recording
+# stop recording
+
+async def main(websocket):
+    
+    tasks = [
+        asyncio.create_task(listener(websocket)),
+        asyncio.create_task(streamHandler(websocket)),
+        
+        # videolistener(websocket)
+        ]
+    
+    try:
+        await asyncio.gather(*tasks)
+    except websockets.exceptions.ConnectionClosed:
+                print("Client Disconnected !")
+                
+                reset_state()
+                for task in tasks:
+                    print(task)
+                    task.cancel()
+
+# receives state from client and updates local state
+async def listener(websocket):
     print("Client Connected !")    
     # result = await websocket.recv()
     # while not websocket.closed:
     #     print(result)
     #     result = json.loads(result)    
-    #     asyncio.create_task(commandHandler(websocket, result))
+    #     asyncio.create_task(onStateChanged(websocket, result))
     #     result = await websocket.recv()
-
-    try:        
-        while True:        
-            result = await websocket.recv()
-            print(result)
-            result = json.loads(result)    
-            asyncio.create_task(commandHandler(websocket, result))
-    except websockets.exceptions.ConnectionClosed:
-        print("Client Disconnected !")
-
-async def commandHandler(websocket, result):
-    if 'command' not in result:
-        print("Expected command (string) in json")
-        return None
-    match result['command']:
-        case "stream":
-            if 'virtualcanvas' not in result:
-                print("Expected virtualcanvas (bool) in json")
+    
         
-            if type(result['virtualcanvas']) != bool:
-                print(f"virtualcanvas is of an invalid type {type(result['virtualcanvas'])} in json")     
+    while True:       
+        print("Awaiting Message") 
+        result = await websocket.recv()
+        print(f"Received Message: {result}")
+        result = json.loads(result)    
+        state.update(result)
+        print(state)
+        # await onStateChanged(websocket, state)
+    
 
-            await stream(websocket, result['virtualcanvas'])
-        case "video":
-            if 'path' not in result:
-                print("Expected path (string) in json")
-            if type(result['path']) != str:
-                print(f"path is of an invalid type {type(result['path'])} in json")    
+# async def onStateChanged(websocket, state):
+#     if state['isCameraToggle'] == False and state['isVirtualCanvasToggle'] and state['fileSelectedPath'] != '':
+#         await video(websocket)
+#     if state['isCameraToggle'] == True:
+#         await stream(websocket)
 
-            await video(websocket, result['path'])    
-        case "record":
-            if type(result['record']) != bool:
-                print(f"record is of an invalid type {type(result['path'])} in json") 
-            global record
-            record = result['record'] 
-            print(record)            
-        case _:
-            print("Invalid Command !")
-    # if result['command'] == "stream":
-    #     if 'virtualcanvas' not in result:
-    #         print("Expected virtualcanvas (bool) in json")
-       
-    #     if type(result['virtualcanvas']) != bool:
-    #         print(f"virtualcanvas is of an invalid type {type(result['virtualcanvas'])} in json")     
-
-    #     await stream(websocket, result['virtualcanvas'])
-        
-        
-    # elif result['command'] == "video":
-    #     if 'path' not in result:
-    #         print("Expected path (string) in json")
-    #     if type(result['path']) != str:
-    #         print(f"path is of an invalid type {type(result['path'])} in json")    
-
-    #     await video(websocket, result['path'])          
-      
-    # else:
-    #     print("Invalid Command !")
-
-async def video(websocket, path):
+async def video(websocket):
     keypoints = []
     try:
-        cap = cv2.VideoCapture(path)
+        cap = cv2.VideoCapture(state['fileSelectedPath'])
             
         frame_width = int(cap.get(3))
         frame_height = int(cap.get(4))
@@ -188,26 +195,36 @@ async def video(websocket, path):
         cap.release()
         result.release()
 
-async def stream(websocket, virtualcanvas):
-    try:
-        cap = cv2.VideoCapture(0)
-            
-        frame_width = int(cap.get(3))
-        frame_height = int(cap.get(4))
+async def streamHandler(websocket):
+    
+    print("Stream Listener is listening !")    
+    while True:
+        await asyncio.sleep(3)
+        # print("Waiting for Stream Listener to be activated !")
+        if state['isCameraToggle']:
+            print("Camera and Virtual Canvas is Activated !")
+            cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)            
+            frame_width = int(cap.get(3))
+            frame_height = int(cap.get(4))                    
+            size = (frame_width, frame_height)       
                 
-        size = (frame_width, frame_height)            
             
-        result = cv2.VideoWriter(f'output\{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.avi', 
-                                        cv2.VideoWriter_fourcc(*'MJPG'),
-                                        10, size)
-        
-        if virtualcanvas == True:
-
-            while cap.isOpened():
+            camwriter = cv2.VideoWriter(fr'output\cam-{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.avi', 
+                                    cv2.VideoWriter_fourcc(*'MJPG'),
+                                    10, size)
+            
+            vcwriter = cv2.VideoWriter(fr'output\vc-{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.avi', 
+                                cv2.VideoWriter_fourcc(*'MJPG'),
+                                10, size)
+            # try:
+            while cap.isOpened() and state['isCameraToggle']:
                 ret, frame = cap.read()
+                
+            
                 if not ret or frame is None:
                     break
-
+                # await websocket.send(            
+                #             json.dumps({"image": frame.tolist()}))
                 img = frame.copy()
                         # img = tf.image.resize_with_pad(
                         #     np.expand_dims(img, axis=0), 192, 192)
@@ -231,39 +248,120 @@ async def stream(websocket, virtualcanvas):
                 draw_connections(virtualcanvas, keypoints_with_scores, EDGES, 0.4)
                 draw_keypoints(virtualcanvas, keypoints_with_scores, 0.4)
 
-                result.write(virtualcanvas)
+            
+                camwriter.write(frame)
+                
+                vcwriter.write(virtualcanvas)
                         
-                encoded = cv2.imencode('.jpg', virtualcanvas)[1]
+                vcencoded = cv2.imencode('.jpg', virtualcanvas)[1]
 
-                data = str(base64.b64encode(encoded))
-                data = data[2:len(data)-1]
+                vcdata = str(base64.b64encode(vcencoded))
+                vcdata = vcdata[2:len(vcdata)-1]
+
+                camencoded = cv2.imencode('.jpg', frame)[1]
+
+                camdata = str(base64.b64encode(camencoded))
+                camdata = camdata[2:len(camdata)-1]
                         
                         # await websocket.send(data)
                 await websocket.send(            
-                            json.dumps({"image": data, "keypoints": np.squeeze(np.multiply(keypoints_with_scores, [frame.shape[0], frame.shape[1] , 1])).tolist()})
-                        )
+                            json.dumps({"camdata": camdata, "vcdata": vcdata, "keypoints": np.squeeze(np.multiply(keypoints_with_scores, [frame.shape[0], frame.shape[1] , 1])).tolist()})
+                        )             
+    
                         
                         # cv2.imshow("Transimission", frame)
                         
                         # if cv2.waitKey(1) & 0xFF == ord('q'):
                         #     break
+            # except websockets.exceptions.ConnectionClosed:
+            #     print("Client Disconnected !")
+                
+            #     reset_state()
+            #     for task in asyncio.all_tasks():
+            #         print(task)
+            #         task.cancel()
+        
+            print("Camera and Virtual Canvas is Deactivated !")
             cap.release()
-            result.release()
-        else:
-            while cap.isOpened():
-                _, frame = cap.read()
-                result.write(frame)
+            camwriter.release()
+            vcwriter.release()
+        
             
-                        
-            cap.release()
-            result.release()
-    except websockets.connection.ConnectionClosed as e:
-        # print(e)
-        cap.release()
-        result.release()
+
+# async def videolistener(websocket):
+#     while True:
+#         if state['isCameraToggle'] == True:
+#             await stream(websocket)
+
+# async def stream(websocket):
+#     try:
+#         cap = cv2.VideoCapture(0)
+            
+#         frame_width = int(cap.get(3))
+#         frame_height = int(cap.get(4))
+                
+#         size = (frame_width, frame_height)            
+            
+#         result = cv2.VideoWriter(f'output\{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.avi', 
+#                                         cv2.VideoWriter_fourcc(*'MJPG'),
+#                                         10, size)
+        
+    
+#         while cap.isOpened():
+#             ret, frame = cap.read()
+#             if not ret or frame is None:
+#                 break
+#             await websocket.send(            
+#                         json.dumps({"image": frame}))
+#             img = frame.copy()
+#                     # img = tf.image.resize_with_pad(
+#                     #     np.expand_dims(img, axis=0), 192, 192)
+#             img = tf.image.resize_with_pad(
+#                         np.expand_dims(img, axis=0), 256, 256)
+#             input_image = tf.cast(img, dtype=tf.float32)
+
+#                     # Setup input and output
+#             input_details = interpreter.get_input_details()
+#             output_details = interpreter.get_output_details()
+
+#                     # Make predictions
+#             interpreter.set_tensor(
+#                         input_details[0]['index'], np.array(input_image))
+#             interpreter.invoke()
+#             keypoints_with_scores = interpreter.get_tensor(
+#                         output_details[0]['index'])
+                    
+#             virtualcanvas = np.zeros((frame_height, frame_width, 3), np.uint8)
+#                     # Rendering
+#             draw_connections(virtualcanvas, keypoints_with_scores, EDGES, 0.4)
+#             draw_keypoints(virtualcanvas, keypoints_with_scores, 0.4)
+
+#             result.write(virtualcanvas)
+                    
+#             encoded = cv2.imencode('.jpg', virtualcanvas)[1]
+
+#             data = str(base64.b64encode(encoded))
+#             data = data[2:len(data)-1]
+                    
+#                     # await websocket.send(data)
+#             await websocket.send(            
+#                         json.dumps({"image": data, "keypoints": np.squeeze(np.multiply(keypoints_with_scores, [frame.shape[0], frame.shape[1] , 1])).tolist()})
+#                     )
+                    
+#                     # cv2.imshow("Transimission", frame)
+                    
+#                     # if cv2.waitKey(1) & 0xFF == ord('q'):
+#                     #     break
+#         cap.release()
+#         result.release()
+        
+#     except websockets.connection.ConnectionClosed as e:
+#         # print(e)
+#         cap.release()
+#         result.release()
     
 
-start_server = websockets.serve(transmit, port=port)
+start_server = websockets.serve(main, port=port)
 
 asyncio.get_event_loop().run_until_complete(start_server)
 asyncio.get_event_loop().run_forever()
