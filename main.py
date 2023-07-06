@@ -91,6 +91,7 @@ async def main(websocket):
     tasks = [
         asyncio.create_task(listener(websocket)),
         asyncio.create_task(streamHandler(websocket)),
+        asyncio.create_task(videoHandler(websocket))
         
         # videolistener(websocket)
         ]
@@ -98,16 +99,17 @@ async def main(websocket):
     try:
         await asyncio.gather(*tasks)
     except websockets.exceptions.ConnectionClosed:
-                print("Client Disconnected !")
-                
-                reset_state()
-                for task in tasks:
-                    print(task)
-                    task.cancel()
+        print("Client Disconnected !")
+        
+        reset_state()
+        for task in tasks:
+            print(task)
+            task.cancel()
 
 # receives state from client and updates local state
 async def listener(websocket):
     print("Client Connected !")    
+    # websocket.send("Connected")
     # result = await websocket.recv()
     # while not websocket.closed:
     #     print(result)
@@ -132,68 +134,138 @@ async def listener(websocket):
 #     if state['isCameraToggle'] == True:
 #         await stream(websocket)
 
-async def video(websocket):
-    keypoints = []
-    try:
-        cap = cv2.VideoCapture(state['fileSelectedPath'])
+# async def video(websocket):
+#     keypoints = []
+#     try:
+#         cap = cv2.VideoCapture(state['fileSelectedPath'])
             
-        frame_width = int(cap.get(3))
-        frame_height = int(cap.get(4))
+#         frame_width = int(cap.get(3))
+#         frame_height = int(cap.get(4))
                 
-        size = (frame_width, frame_height)            
+#         size = (frame_width, frame_height)            
             
-        result = cv2.VideoWriter(f'{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.avi', 
-                                        cv2.VideoWriter_fourcc(*'MJPG'),
-                                        10, size)
+#         result = cv2.VideoWriter(f'{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.avi', 
+#                                         cv2.VideoWriter_fourcc(*'MJPG'),
+#                                         10, size)
        
 
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret or frame is None:
-                    break
+#         while cap.isOpened():
+#             ret, frame = cap.read()
+#             if not ret or frame is None:
+#                     break
 
-            img = frame.copy()
-                    # img = tf.image.resize_with_pad(
-                    #     np.expand_dims(img, axis=0), 192, 192)
-            img = tf.image.resize_with_pad(
-                        np.expand_dims(img, axis=0), 256, 256)
-            input_image = tf.cast(img, dtype=tf.float32)
+#             img = frame.copy()
+#                     # img = tf.image.resize_with_pad(
+#                     #     np.expand_dims(img, axis=0), 192, 192)
+#             img = tf.image.resize_with_pad(
+#                         np.expand_dims(img, axis=0), 256, 256)
+#             input_image = tf.cast(img, dtype=tf.float32)
 
-                    # Setup input and output
-            input_details = interpreter.get_input_details()
-            output_details = interpreter.get_output_details()
+#                     # Setup input and output
+#             input_details = interpreter.get_input_details()
+#             output_details = interpreter.get_output_details()
 
-                    # Make predictions
-            interpreter.set_tensor(
-                        input_details[0]['index'], np.array(input_image))
-            interpreter.invoke()
-            keypoints_with_scores = interpreter.get_tensor(
-                        output_details[0]['index'])
-            keypoints.append(np.squeeze(np.multiply(keypoints_with_scores, [frame.shape[0], frame.shape[1] , 1])).tolist())
+#                     # Make predictions
+#             interpreter.set_tensor(
+#                         input_details[0]['index'], np.array(input_image))
+#             interpreter.invoke()
+#             keypoints_with_scores = interpreter.get_tensor(
+#                         output_details[0]['index'])
+#             keypoints.append(np.squeeze(np.multiply(keypoints_with_scores, [frame.shape[0], frame.shape[1] , 1])).tolist())
             
-            virtualcanvas = np.zeros((frame_height, frame_width, 3), np.uint8)
+#             virtualcanvas = np.zeros((frame_height, frame_width, 3), np.uint8)
 
-                    # Rendering
-            draw_connections(virtualcanvas, keypoints_with_scores, EDGES, 0.4)
-            draw_keypoints(virtualcanvas, keypoints_with_scores, 0.4)
+#                     # Rendering
+#             draw_connections(virtualcanvas, keypoints_with_scores, EDGES, 0.4)
+#             draw_keypoints(virtualcanvas, keypoints_with_scores, 0.4)
 
-            result.write(virtualcanvas) 
+#             result.write(virtualcanvas) 
 
-        await websocket.send(            
-                            json.dumps({"keypoints": keypoints})
-                        )                 
+#         await websocket.send(            
+#                             json.dumps({"keypoints": keypoints})
+#                         )                 
             
                     
-        cap.release()
-        result.release()
-    except Exception as e:
-        cap.release()
-        result.release()
+#         cap.release()
+#         result.release()
+#     except Exception as e:
+#         cap.release()
+#         result.release()
         
-    except websockets.connection.ConnectionClosed as e:
-        # print(e)
-        cap.release()
-        result.release()
+#     except websockets.connection.ConnectionClosed as e:
+#         # print(e)
+#         cap.release()
+#         result.release()
+
+async def videoHandler(websocket):
+    print("Video Listener is listening !")
+    currentFile = state['fileSelectedPath']
+    while True:
+        
+            
+        if state['isCameraToggle'] == False and state['isVirtualCanvasToggle'] and state['fileSelectedPath'] != '' and currentFile != state['fileSelectedPath']:
+            print("Virtual Canvas Activated !")
+            keypoints = []
+            currentFile = state['fileSelectedPath']
+            cap = cv2.VideoCapture(currentFile)
+                
+            frame_width = int(cap.get(3))
+            frame_height = int(cap.get(4))
+                    
+            size = (frame_width, frame_height)            
+                
+            vcwriter = cv2.VideoWriter(fr'output\vc-{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.avi', 
+                                cv2.VideoWriter_fourcc(*'MJPG'),
+                                10, size)
+            
+
+            while cap.isOpened():
+                # print("Virtual Canvas is Recording !")
+                ret, frame = cap.read()
+                if not ret or frame is None:
+                        break
+
+                img = frame.copy()
+                        # img = tf.image.resize_with_pad(
+                        #     np.expand_dims(img, axis=0), 192, 192)
+                img = tf.image.resize_with_pad(
+                            np.expand_dims(img, axis=0), 256, 256)
+                input_image = tf.cast(img, dtype=tf.float32)
+
+                        # Setup input and output
+                input_details = interpreter.get_input_details()
+                output_details = interpreter.get_output_details()
+
+                        # Make predictions
+                interpreter.set_tensor(
+                            input_details[0]['index'], np.array(input_image))
+                interpreter.invoke()
+                keypoints_with_scores = interpreter.get_tensor(
+                            output_details[0]['index'])
+                keypoints.append(np.squeeze(np.multiply(keypoints_with_scores, [frame.shape[0], frame.shape[1] , 1])).tolist())
+                
+                virtualcanvas = np.zeros((frame_height, frame_width, 3), np.uint8)
+
+                        # Rendering
+                draw_connections(virtualcanvas, keypoints_with_scores, EDGES, 0.4)
+                draw_keypoints(virtualcanvas, keypoints_with_scores, 0.4)
+
+                vcwriter.write(virtualcanvas) 
+
+            await websocket.send(            
+                                json.dumps({"keypoints": keypoints})
+                            )                 
+            
+                        
+            cap.release()
+            vcwriter.release()
+            print("Processing Successful !")
+        else:
+        
+            await asyncio.sleep(1)    
+    
+
+
 
 async def streamHandler(websocket):
     
@@ -365,3 +437,4 @@ start_server = websockets.serve(main, port=port)
 
 asyncio.get_event_loop().run_until_complete(start_server)
 asyncio.get_event_loop().run_forever()
+asyncio.get_event_loop().set_debug()
