@@ -291,15 +291,17 @@ async def streamHandler(websocket):
             frame_width = int(cap.get(3))
             frame_height = int(cap.get(4))                    
             size = (frame_width, frame_height)       
-                
             
-            camwriter = cv2.VideoWriter(fr'{state["projectPath"]}\Videos\cam-{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.avi', 
-                                    cv2.VideoWriter_fourcc(*'MJPG'),
-                                    10, size)
+            camwriter = None
+            vcwriter = None
             
-            vcwriter = cv2.VideoWriter(fr'{state["projectPath"]}\Videos\vc-{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.avi', 
-                                cv2.VideoWriter_fourcc(*'MJPG'),
-                                10, size)
+            # camwriter = cv2.VideoWriter(fr'{state["projectPath"]}\Videos\cam-{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.avi', 
+            #                         cv2.VideoWriter_fourcc(*'MJPG'),
+            #                         10, size)
+            
+            # vcwriter = cv2.VideoWriter(fr'{state["projectPath"]}\Videos\vc-{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.avi', 
+            #                     cv2.VideoWriter_fourcc(*'MJPG'),
+            #                     10, size)
             # try:
             while cap.isOpened() and state['isCameraToggle']:
                 ret, frame = cap.read()
@@ -332,10 +334,28 @@ async def streamHandler(websocket):
                 draw_connections(virtualcanvas, keypoints_with_scores, EDGES, 0.4)
                 draw_keypoints(virtualcanvas, keypoints_with_scores, 0.4)
 
-            
-                camwriter.write(frame)
-                
-                vcwriter.write(virtualcanvas)
+                if state['isRecording']:
+                    if camwriter is None:
+                        camwriter = cv2.VideoWriter(fr'{state["projectPath"]}\Videos\cam-{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.avi', 
+                                cv2.VideoWriter_fourcc(*'MJPG'),
+                                10, size)
+                        print("Camera is Recording !")
+                    if vcwriter is None:
+                        vcwriter = cv2.VideoWriter(fr'{state["projectPath"]}\Videos\vc-{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.avi', 
+                                cv2.VideoWriter_fourcc(*'MJPG'),
+                                10, size)
+                        print("Virtual Canvas is Recording !")
+                    camwriter.write(frame)                    
+                    vcwriter.write(virtualcanvas)
+                else:
+                    if camwriter is not None:
+                        print("Camera has finished recording !")
+                        camwriter.release()
+                        camwriter = None
+                    if vcwriter is not None:
+                        print("Virtual Canvas has finished recording !")
+                        vcwriter.release()
+                        vcwriter = None
                         
                 vcencoded = cv2.imencode('.jpg', virtualcanvas)[1]
 
@@ -367,8 +387,8 @@ async def streamHandler(websocket):
         
             print("Camera and Virtual Canvas is Deactivated !")
             cap.release()
-            camwriter.release()
-            vcwriter.release()
+            # camwriter.release()
+            # vcwriter.release()
         
             
 
