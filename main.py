@@ -56,9 +56,21 @@ def draw_connections(frame, keypoints, edges, confidence_threshold):
 
 def reset_state():
     global state
-    state = {'isCameraToggle': False, 'isVirtualCanvasToggle': False, 'isRecording': False, 'fileSelectedPath': ''}
+    state = {
+        'isCameraToggle': False,
+        'isVirtualCanvasToggle': False, 
+        'isRecording': False, 
+        'fileSelectedPath': '', 
+        'projectPath': ''
+        }
 
-state = {'isCameraToggle': False, 'isVirtualCanvasToggle': False, 'isRecording': False, 'fileSelectedPath': ''}
+state = {
+    'isCameraToggle': False, 
+    'isVirtualCanvasToggle': False, 
+    'isRecording': False, 
+    'fileSelectedPath': '', 
+    'projectPath': ''
+    }
 port = 5000
 print("Started server on port : ", port)
 
@@ -214,7 +226,7 @@ async def videoHandler(websocket):
                     
             size = (frame_width, frame_height)            
                 
-            vcwriter = cv2.VideoWriter(fr'output\vc-{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.avi', 
+            vcwriter = cv2.VideoWriter(fr'{state["projectPath"]}\Videos\vc-{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.avi', 
                                 cv2.VideoWriter_fourcc(*'MJPG'),
                                 10, size)
             
@@ -281,11 +293,11 @@ async def streamHandler(websocket):
             size = (frame_width, frame_height)       
                 
             
-            camwriter = cv2.VideoWriter(fr'output\cam-{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.avi', 
+            camwriter = cv2.VideoWriter(fr'{state["projectPath"]}\Videos\cam-{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.avi', 
                                     cv2.VideoWriter_fourcc(*'MJPG'),
                                     10, size)
             
-            vcwriter = cv2.VideoWriter(fr'output\vc-{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.avi', 
+            vcwriter = cv2.VideoWriter(fr'{state["projectPath"]}\Videos\vc-{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.avi', 
                                 cv2.VideoWriter_fourcc(*'MJPG'),
                                 10, size)
             # try:
